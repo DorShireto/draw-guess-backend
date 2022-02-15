@@ -9,43 +9,71 @@ const mongo_async_handler = require('./DAL/mongo_handler');
 const port = process.env.PORT || "3001";
 
 
-// connect to mongoDB
-// const dbURI = "mongodb+srv://shiretod:dorDrawAndGuess@drawandguessdb.q0gcs.mongodb.net/drawandguessDB?retryWrites=true&w=majority";
-// const dbConnection = await mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true });
+let gameStruct = { // default game struct
+    user1: '',
+    user1HighestScore: 0,
+    user2: '',
+    user2HighestScore: 0,
+    roomCreated: false,
+    currentWord: '',
+    roomID: '',
+    whosTurn: '',
+    gameScore: 0
+}
+
+const add_user_to_game_struct = (userName, highestScore) => {
+    const { user1, user2 } = gameStruct;
+    if (user1 === '') {
+        gameStruct.user1 = userName;
+        gameStruct.user1HighestScore = highestScore;
+        // return true;
+    }
+    else if (user2 === '') {
+        gameStruct.user2 = userName;
+        gameStruct.user2HighestScore = highestScore;
+        // return true; 
+    }
+    // else return false;
+}
+
+const set_word = (word) => {
+    gameStruct.currentWord = word;
+}
+const set_turn = (userName) => {
+    if (gameStruct.user1 === userName) gameStruct.whosTurn = 1;
+    else gameStruct.whosTurn = 2;
+}
 
 
-
-
-// app.get('/', (req, res) => {
-//     res.send('Working');
-// })
-
-
-
-// app.get('/profile/:id', (req, res) => {
-//     let found = false;
-//     const uid = req.params.id;
-//     let user = db.users.forEach(user => {
-//         if (user.id === uid) {
-//             found = true;
-//             return res.status(200).json(user);
-//         }
-//     });
-//     if (!found)
-//         res.status(404).send('No user found');
-// })
 
 async function main() {
 
     // express app
-    const app = express();
-    app.use(express.json());
-    app.use(cors())
+    const app = express(); // create server
+    app.use(express.json()); // parsing
+    app.use(cors()) // Cross-Origin Resource Sharing
 
     await mongo_async_handler.init_mongo_connection();
     app.listen(port, () => { // function that will start as enter to server
         console.log(`App running on port ${port}`);
     })
+
+    /**
+     * Registration End-point
+     * type: Post
+     * required: Request body
+     * Body schema example:
+     *      {
+     *          "userName" : "DorUser",
+     *          "password" : "password",
+     *          "email" : "dorEmail@email.com"
+     *      }
+     * Responses:
+     *      200: User has been added, user object will be returned
+     *      409: User already exist - same email
+     * 
+    */
+
     app.post('/register', async (req, res, next) => {
         try {
             console.log("Register been called")
@@ -54,9 +82,11 @@ async function main() {
                 "userName": userName,
                 "password": password,
                 "email": email,
+                "highestScore": 0
             };
             let result = await mongo_async_handler.add_object_async(newUser);
             if (result) {
+                add_user_to_game_struct(userName, 0) // update game struct
                 res.status(200).send(newUser);
             }
             else {
@@ -68,7 +98,21 @@ async function main() {
         }
     })
 
-
+    /**
+     * Login End-point
+     * type: Post
+     * required: Request body
+     * Body schema example:
+     *      {
+     *          "password" : "password",
+     *          "email" : "dorEmail@email.com"
+    *           "highestScore" : "751"
+     *      }
+     * Responses:
+     *      200: Login successfully, user object will be attached
+     *      403: Wrong input - email or password are wrong.
+     * 
+    */
     app.post('/signin', async (req, res, next) => {
         try {
             const { email, password } = req.body
@@ -76,15 +120,65 @@ async function main() {
             if (result == 0 || result.password !== password) {
                 res.status(403).send('Error: Email or password are incorrect')
             }
-
-            res.status(200).send({ 'email': email, 'password': password, userName: result.userName });
+            const userToRerun = { 'email': email, 'password': password, 'userName': result.userName, 'highestScore': result.highestScore }
+            add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
+            res.status(200).send(userToRerun);
         }
         catch (err) {
             next(err);
         }
-
     })
 
+    /**
+     * Did-game-created End-point
+     * type: get
+     * required: none
+     * Responses:
+     *      200: Game was created, attaching gameStruct
+     *      204: Game room was not created
+    */
+    app.get('/did-game-created', (req, res) => {
+        const { roomCreated } = gameStruct;
+        if (!roomCreated) {
+            res.status(204).send('No game was created yet');
+        }
+        else {
+            res.status(200).send(gameStruct)
+        }
+    })
+
+
+    /**
+     * Create room End-point
+     * type: Post
+     * required: Request body
+     * Body schema example:
+     *      {
+     *          "chosenWord" : "moveo",
+     *          "userName" : "boost"
+     *      }
+     * Responses:
+     *      200: Room created, (TODO - will add the game socket!)
+     *      400: Wrong input - chosenWord or userName were not givin.
+     * 
+    */
+    app.post('/create-room', async (req, res, next) => {
+        try {
+            const { chosenWord, userName } = req.body;
+            if (chosenWord === undefined || userName === undefined) {
+                res.status(400).send('Error: missing parameters word / username')
+            }
+            set_word(chosenWord);
+            set_turn(userName);
+            gameStruct.roomCreated = true;
+            res.status(200).send(gameStruct);
+            //todo: need to create here the socket and add this user to the sockeet
+        }
+        catch (err) {
+            console.log("Error at /create-room endpoint ", err);
+            next(err);
+        }
+    })
 }
 
 
