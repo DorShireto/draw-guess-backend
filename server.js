@@ -4,6 +4,7 @@ const axios = require('axios');
 const cors = require('cors'); // allow communication in http at chrome based browser engine
 const bcrypt = require("bcryptjs"); // passwords and other encryption 
 const mongoose = require('mongoose'); // communication with mongoDB 
+require('dotenv').config() // all access to process.env
 const mongo_async_handler = require('./DAL/mongo_handler');
 const port = process.env.PORT || "3001";
 

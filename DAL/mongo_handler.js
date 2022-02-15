@@ -3,7 +3,7 @@ const mongoose = require('mongoose'); // communication with mongoDB
 // const MongoClient = mongo.MongoClient;
 
 const COLLECTION = { USERS: "draw-guess-users" }
-const dbURI = "mongodb+srv://shiretod:dorDrawAndGuess@drawandguessdb.q0gcs.mongodb.net/drawandguessDB?retryWrites=true&w=majority";
+const dbURI = process.env.MONGO_URL;
 const Schema = mongoose.Schema;
 const userSchema = new Schema({
     userName: {
