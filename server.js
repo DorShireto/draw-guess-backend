@@ -16,6 +16,7 @@ let gameStruct = { // default game struct
     user2HighestScore: 0,
     roomCreated: false,
     currentWord: '',
+    wordLevel: 0,
     roomID: '',
     whosTurn: '',
     gameScore: 0
@@ -155,6 +156,7 @@ async function main() {
      * Body schema example:
      *      {
      *          "chosenWord" : "moveo",
+     *          "level": 3,
      *          "userName" : "boost"
      *      }
      * Responses:
@@ -164,10 +166,11 @@ async function main() {
     */
     app.post('/create-room', async (req, res, next) => {
         try {
-            const { chosenWord, userName } = req.body;
+            const { chosenWord, level, userName } = req.body;
             if (chosenWord === undefined || userName === undefined) {
                 res.status(400).send('Error: missing parameters word / username')
             }
+            gameStruct.level = level;
             set_word(chosenWord);
             set_turn(userName);
             gameStruct.roomCreated = true;
