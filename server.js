@@ -15,7 +15,7 @@ let gameStruct = { // default game struct
     user2: '',
     user2HighestScore: 0,
     roomCreated: false,
-    currentWord: '',
+    currentWord: 'test',
     wordLevel: 0,
     roomID: '',
     whosTurn: '',
@@ -181,6 +181,25 @@ async function main() {
             console.log("Error at /create-room endpoint ", err);
             next(err);
         }
+    })
+
+    /**
+     * Guess the word End-point
+     * type: get
+     * required: url param
+     * /guess-word/someWord
+     * Responses:
+     *      200: Current guess
+     *      409: Wrong guess
+     */
+    app.get("/guess-word/:word", (req, res) => {
+        let word = req.params.word;
+        console.log("In guess-word endpoint, word got is: ", word)
+        if (word === gameStruct.currentWord) { // current guess
+            //TODO: update gameStruct!!! - here?
+            res.status(200).send("Good guess, change turns.")
+        }
+        else res.status(409).send("Wrong guess, try again."); // wrong guess
     })
 }
 
