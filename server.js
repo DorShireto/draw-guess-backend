@@ -1,60 +1,74 @@
+// Server tools
 const { json } = require('express');
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors'); // allow communication in http at chrome based browser engine
-const bcrypt = require("bcryptjs"); // passwords and other encryption 
-const mongoose = require('mongoose'); // communication with mongoDB 
+const cors = require('cors'); // allow communication in http at chrome based browser engine 
 require('dotenv').config() // all access to process.env
 const mongo_async_handler = require('./DAL/mongo_handler');
 const port = process.env.PORT || "3001";
+const GameUtils = require('./utils/gameLogic')
+let gameStruct = require('./resources/GameStruct')
 
 
-let gameStruct = { // default game struct
-    user1: '',
-    user1HighestScore: 0,
-    user2: '',
-    user2HighestScore: 0,
-    roomCreated: false,
-    currentWord: 'test',
-    wordLevel: 0,
-    roomID: '',
-    whosTurn: '',
-    gameScore: 0
-}
+// let gameStruct = { // default game struct
+//     user1: '',
+//     user1HighestScore: 0,
+//     user2: '',
+//     user2HighestScore: 0,
+//     roomCreated: false,
+//     currentWord: 'test',
+//     wordLevel: 0,
+//     roomID: '',
+//     whosTurn: '',
+//     gameScore: 0,
+//     canvas: null,
+// }
 
-const add_user_to_game_struct = (userName, highestScore) => {
-    const { user1, user2 } = gameStruct;
-    if (user1 === '') {
-        gameStruct.user1 = userName;
-        gameStruct.user1HighestScore = highestScore;
-        // return true;
-    }
-    else if (user2 === '') {
-        gameStruct.user2 = userName;
-        gameStruct.user2HighestScore = highestScore;
-        // return true; 
-    }
-    // else return false;
-}
+// const add_user_to_game_struct = (userName, highestScore) => {
+//     const { user1, user2 } = gameStruct;
+//     if (user1 === '') {
+//         gameStruct.user1 = userName;
+//         gameStruct.user1HighestScore = highestScore;
+//         // return true;
+//     }
+//     else if (user2 === '') {
+//         gameStruct.user2 = userName;
+//         gameStruct.user2HighestScore = highestScore;
+//         // return true; 
+//     }
+//     // else return false;
+// }
 
-const set_word = (word) => {
-    gameStruct.currentWord = word;
-}
-const set_turn = (userName) => {
-    if (gameStruct.user1 === userName) gameStruct.whosTurn = 1;
-    else gameStruct.whosTurn = 2;
-}
+// const set_word = (word) => {
+//     gameStruct.currentWord = word;
+// }
+// const set_turn = (userName) => {
+//     if (gameStruct.user1 === userName) gameStruct.whosTurn = 1;
+//     else gameStruct.whosTurn = 2;
+// }
 
 
 
 async function main() {
-
     // express app
     const app = express(); // create server
     app.use(express.json()); // parsing
     app.use(cors()) // Cross-Origin Resource Sharing
-
+    // DB connection
     await mongo_async_handler.init_mongo_connection();
+    // WebSocket Server using socket.io
+    // const server = http.createServer(app)
+    // socket.init(server);
+    // server.listen(port, () => { // function that will start as enter to server
+    //     console.log(`App running on port ${port}`);
+    // })
+
+    app.get("/ping", (req, res) => {
+        res.send("pong");
+
+    })
+
+
     app.listen(port, () => { // function that will start as enter to server
         console.log(`App running on port ${port}`);
     })
@@ -87,7 +101,8 @@ async function main() {
             };
             let result = await mongo_async_handler.add_object_async(newUser);
             if (result) {
-                add_user_to_game_struct(userName, 0) // update game struct
+                GameUtils.add_user_to_game_struct(userName, 0)
+                // add_user_to_game_struct(userName, 0) // update game struct
                 res.status(200).send(newUser);
             }
             else {
@@ -107,7 +122,6 @@ async function main() {
      *      {
      *          "password" : "password",
      *          "email" : "dorEmail@email.com"
-    *           "highestScore" : "751"
      *      }
      * Responses:
      *      200: Login successfully, user object will be attached
@@ -116,13 +130,14 @@ async function main() {
     */
     app.post('/signin', async (req, res, next) => {
         try {
+            console.log("/signin triggered");
             const { email, password } = req.body
             let result = await mongo_async_handler.find_user_async(email);
             if (result == 0 || result.password !== password) {
                 res.status(403).send('Error: Email or password are incorrect')
             }
             const userToRerun = { 'email': email, 'password': password, 'userName': result.userName, 'highestScore': result.highestScore }
-            add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
+            GameUtils.add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
             res.status(200).send(userToRerun);
         }
         catch (err) {
@@ -170,10 +185,14 @@ async function main() {
             if (chosenWord === undefined || userName === undefined) {
                 res.status(400).send('Error: missing parameters word / username')
             }
-            gameStruct.level = level;
-            set_word(chosenWord);
-            set_turn(userName);
-            gameStruct.roomCreated = true;
+            GameUtils.set_level(level);
+            GameUtils.set_word(chosenWord)
+            GameUtils.set_turn(userName)
+            GameUtils.set_room_created(true)
+            // gameStruct.level = level;
+            // set_word(chosenWord);
+            // set_turn(userName);
+            // gameStruct.roomCreated = true;
             res.status(200).send(gameStruct);
             //todo: need to create here the socket and add this user to the sockeet
         }
@@ -201,6 +220,62 @@ async function main() {
         }
         else res.status(409).send("Wrong guess, try again."); // wrong guess
     })
+
+
+    /**
+     * Post canvas End-point
+     * type: post
+     * required: Request body
+     * Body schema example:
+     *      {
+     *          "type" : "canvas object",
+     *          "canvas": canvasObject,
+     *      }
+     * Responses:
+     *      200: Got canvas - update gameStruct
+     *      404: No canvas object was found
+     */
+    app.post("/post-canvas", (req, res) => {
+        console.log(req.body);
+        const { canvas } = req.body;
+        try {
+            if (canvas !== undefined) {
+                console.log("Got canvas element from user")
+                res.status(200).send("Got canvas")
+                GameUtils.set_canvas(canvas)
+                // gameStruct.canvas = canvas;
+            }
+            else res.status(404).send("No canvas was found")
+        } catch (error) {
+            console.log("Error at /post-canvas endpoint ", error);
+            next(error);
+        }
+    })
+
+
+
+    /**
+     * Get canvas End-point
+     * type: get
+     * required: none
+     * Responses:
+     *      200: Canvas found + canvas object
+     *      404: No canvas found
+     */
+    app.get("/get-canvas", (req, res) => {
+        console.log("In get-canvas endpoint")
+        let c = GameUtils.get_canvas();
+        let canvas2 = gameStruct.canvas
+        const { canvas } = { gameStruct }
+        if (canvas === null) {
+            console.log("No canvas was found")
+            res.status(404).send("No canvas was sen't yes")
+        }
+        else {
+            console.log("Sending canvas...")
+            res.status(200).send(gameStruct.canvas);
+        }
+    })
 }
 
 
@@ -208,19 +283,4 @@ async function main() {
 
 main();
 
-/**
- * /signin --> POST - 200 / 404
- * /register --> POST - 200 + new user object/404
- * /profile/:userId --> GET = user
- * /
- */
-
-
-
-
-// Add routes
-// routes.get('/', SessionController.store);
-// routes.post('/', SessionController.store);
-// routes.put('/', SessionController.store);
-// routes.delete('/', SessionController.store);
 

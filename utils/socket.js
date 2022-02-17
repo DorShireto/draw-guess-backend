@@ -8,6 +8,7 @@ exports.init = (server) => {
         }
     });
     io.on('connection', socket => {
+        socket.emit('user-connection', 'User have join server')
         console.log("Socket connected with ", socket.id);
         let { username, roomId, action } = socket.handshake.query;
         console.log(username, roomId, action)
