@@ -6,8 +6,8 @@ const cors = require('cors'); // allow communication in http at chrome based bro
 require('dotenv').config() // all access to process.env
 const mongo_async_handler = require('./DAL/mongo_handler');
 const port = process.env.PORT || "3001";
-const GameUtils = require('./utils/gameLogic')
-let gameStruct = require('./resources/GameStruct')
+// const GameUtils = require('./utils/gameLogic')
+var gameLogic = require('./utils/gameLogic')
 
 
 // let gameStruct = { // default game struct
@@ -56,6 +56,11 @@ async function main() {
     app.use(cors()) // Cross-Origin Resource Sharing
     // DB connection
     await mongo_async_handler.init_mongo_connection();
+    // Game Struct class
+    var game = new gameLogic.GameStruct();
+
+
+
     // WebSocket Server using socket.io
     // const server = http.createServer(app)
     // socket.init(server);
@@ -101,7 +106,7 @@ async function main() {
             };
             let result = await mongo_async_handler.add_object_async(newUser);
             if (result) {
-                GameUtils.add_user_to_game_struct(userName, 0)
+                game.add_user_to_game_struct(userName, 0)
                 // add_user_to_game_struct(userName, 0) // update game struct
                 res.status(200).send(newUser);
             }
@@ -137,7 +142,8 @@ async function main() {
                 res.status(403).send('Error: Email or password are incorrect')
             }
             const userToRerun = { 'email': email, 'password': password, 'userName': result.userName, 'highestScore': result.highestScore }
-            GameUtils.add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
+            const answer = game.add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
+            console.log("Checking")
             res.status(200).send(userToRerun);
         }
         catch (err) {
@@ -154,12 +160,16 @@ async function main() {
      *      204: Game room was not created
     */
     app.get('/did-game-created', (req, res) => {
-        const { roomCreated } = gameStruct;
+        // console.log(gameStruct.gameStruct.roomCreated);
+        // const { roomCreated: roomCreated } = game.roomCreated;
+        const roomCreated = game.roomCreated;
+
         if (!roomCreated) {
             res.status(204).send('No game was created yet');
         }
         else {
-            res.status(200).send(gameStruct)
+            const game_struct = game.get_game_struct()
+            res.status(200).send(game_struct)
         }
     })
 
@@ -185,14 +195,16 @@ async function main() {
             if (chosenWord === undefined || userName === undefined) {
                 res.status(400).send('Error: missing parameters word / username')
             }
-            GameUtils.set_level(level);
-            GameUtils.set_word(chosenWord)
-            GameUtils.set_turn(userName)
-            GameUtils.set_room_created(true)
+            game.set_level(level);
+            game.set_word(chosenWord)
+            game.set_turn(userName)
+            game.set_room_created(true)
             // gameStruct.level = level;
             // set_word(chosenWord);
             // set_turn(userName);
             // gameStruct.roomCreated = true;
+            const gameStruct = game.get_game_struct()
+            console.log("Returning game: ", gameStruct)
             res.status(200).send(gameStruct);
             //todo: need to create here the socket and add this user to the sockeet
         }
@@ -214,7 +226,7 @@ async function main() {
     app.get("/guess-word/:word", (req, res) => {
         let word = req.params.word;
         console.log("In guess-word endpoint, word got is: ", word)
-        if (word === gameStruct.currentWord) { // current guess
+        if (word === game.currentWord) { // current guess
             //TODO: update gameStruct!!! - here?
             res.status(200).send("Good guess, change turns.")
         }
@@ -242,7 +254,7 @@ async function main() {
             if (canvas !== undefined) {
                 console.log("Got canvas element from user")
                 res.status(200).send("Got canvas")
-                GameUtils.set_canvas(canvas)
+                game.set_canvas(canvas)
                 // gameStruct.canvas = canvas;
             }
             else res.status(404).send("No canvas was found")
@@ -264,17 +276,24 @@ async function main() {
      */
     app.get("/get-canvas", (req, res) => {
         console.log("In get-canvas endpoint")
-        let c = GameUtils.get_canvas();
-        let canvas2 = gameStruct.canvas
-        const { canvas } = { gameStruct }
+        const canvas = game.canvas;
         if (canvas === null) {
             console.log("No canvas was found")
             res.status(404).send("No canvas was sen't yes")
         }
         else {
             console.log("Sending canvas...")
-            res.status(200).send(gameStruct.canvas);
+            res.status(200).send(game.canvas);
         }
+    })
+
+    app.get('/room-status', (req, res) => {
+        console.log("Room status request")
+        const game_struct = game.get_game_struct()
+        if (game_struct !== undefined) {
+            res.status(200).send(game_struct)
+        }
+        res.status(404)
     })
 }
 
