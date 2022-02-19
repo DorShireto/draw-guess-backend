@@ -226,8 +226,7 @@ async function main() {
     app.get("/guess-word/:word", (req, res) => {
         let word = req.params.word;
         console.log("In guess-word endpoint, word got is: ", word)
-        if (word === game.currentWord) { // current guess
-            //TODO: update gameStruct!!! - here?
+        if (word === game.currentWord.toLowerCase()) { // current guess
             res.status(200).send("Good guess, change turns.")
         }
         else res.status(409).send("Wrong guess, try again."); // wrong guess
@@ -247,7 +246,7 @@ async function main() {
      *      200: Got canvas - update gameStruct
      *      404: No canvas object was found
      */
-    app.post("/post-canvas", (req, res) => {
+    app.post("/post-canvas", (req, res, next) => {
         console.log(req.body);
         const { canvas } = req.body;
         try {
@@ -265,35 +264,94 @@ async function main() {
     })
 
 
-
     /**
      * Get canvas End-point
      * type: get
      * required: none
      * Responses:
      *      200: Canvas found + canvas object
-     *      404: No canvas found
+     *      304: - Not Modified -  No canvas found /  User already see the most up to date canvas
      */
     app.get("/get-canvas", (req, res) => {
-        console.log("In get-canvas endpoint")
-        const canvas = game.canvas;
-        if (canvas === null) {
-            console.log("No canvas was found")
-            res.status(404).send("No canvas was sen't yes")
+        // console.log("In get-canvas endpoint");
+        const canvas = game.get_canvas();
+        if (canvas !== false) {
+            console.log("Sending canvas...");
+            res.status(200).send(canvas);
         }
-        else {
-            console.log("Sending canvas...")
-            res.status(200).send(game.canvas);
-        }
+        // console.log("No canvas was found or current canvas have already sent")
+        else res.status(304).send("No canvas was sen't yet or you already have the most up to date canvas")
+
+        // if (canvas === false) {// Canvas have not changed
+        //     console.log("No canvas was found or current canvas have already sent")
+        //     res.status(304).send("No canvas was sen't yet or you already have the most up to date canvas")
+        // }
+        // else {
+        //     console.log("Sending canvas...");
+        //     res.status(200).send(canvas);
+        // }
     })
 
-    app.get('/room-status', (req, res) => {
+
+    /**
+     * Get room struct End-point
+     * type: get
+     * required: none
+     * Responses:
+     *      200: Room struct (the struct can be seen at ./utils/gameLogic.js for more information)
+     *      404: No room struct was found
+     */
+    app.get('/room-struct', (req, res) => {
         console.log("Room status request")
         const game_struct = game.get_game_struct()
         if (game_struct !== undefined) {
             res.status(200).send(game_struct)
         }
         res.status(404)
+    })
+
+
+    /**
+     * Method to update game struct due to correct guessing by client 
+     * Get win round End-point
+     * type: get
+     * required: none
+     * Responses:
+     *      200: Update successfully
+     *      404: Error in updating
+     */
+    app.get('/win-round', async (req, res, next) => {
+        try {
+            console.log("Updating about round winning...");
+            game.update_scores();
+            game.update_turns();
+            game.change_round()
+            console.log("Win-round... updated scores..")
+            res.status(200).send("Turns and scores were updated...")
+        } catch (error) {
+            console.log("Error at /win-round endpoint ", error);
+            res.status(404).send(error);
+            next(error); // needed???
+        }
+    })
+
+    /**
+     * Method to check if round ended 
+     * Get check round change End-point
+     * type: get
+     * required: none
+     * Responses:
+     *      200: Round changed + game struct
+     *      304: - Not Modified -  round is not over 
+     */
+    app.get('/check-round-change', (req, res) => {
+        const roundChanged = game.check_for_change_round()
+        if (roundChanged) { // true
+            console.log("Round changed")
+            const game_struct = game.get_game_struct()
+            res.status(200).send(game_struct)
+        }
+        else res.status(304).send()
     })
 }
 
