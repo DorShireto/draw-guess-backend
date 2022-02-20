@@ -89,7 +89,8 @@ async function main() {
      *          "email" : "dorEmail@email.com"
      *      }
      * Responses:
-     *      200: User has been added, user object will be returned
+     *      201: User has been added, user object will be returned
+     *      202: User was added but room is full!
      *      409: User already exist - same email
      * 
     */
@@ -106,9 +107,11 @@ async function main() {
             };
             let result = await mongo_async_handler.add_object_async(newUser);
             if (result) {
-                game.add_user_to_game_struct(userName, 0)
-                // add_user_to_game_struct(userName, 0) // update game struct
-                res.status(200).send(newUser);
+                const answer = game.add_user_to_game_struct(userName, 0)
+                if (answer === 1 || answer === 2) { res.status(201).send(newUser); }
+                else {
+                    res.status(202).send(newUser);
+                }
             }
             else {
                 res.status(409).send('Error: email already exist')
@@ -130,6 +133,7 @@ async function main() {
      *      }
      * Responses:
      *      200: Login successfully, user object will be attached
+     *      304: No place in room
      *      403: Wrong input - email or password are wrong.
      * 
     */
@@ -141,10 +145,16 @@ async function main() {
             if (result == 0 || result.password !== password) {
                 res.status(403).send('Error: Email or password are incorrect')
             }
-            const userToRerun = { 'email': email, 'password': password, 'userName': result.userName, 'highestScore': result.highestScore }
-            const answer = game.add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
-            console.log("Checking")
-            res.status(200).send(userToRerun);
+            else {
+                const userToRerun = { 'email': email, 'password': password, 'userName': result.userName, 'highestScore': result.highestScore, 'updatedAt': result.updatedAt }
+                const answer = game.add_user_to_game_struct(userToRerun.userName, userToRerun.highestScore); // update game struct
+                if (answer === 1 || answer === 2) {
+                    res.status(200).send(userToRerun);
+                }
+                else {
+                    res.status(304).send("Room is full")
+                }
+            }
         }
         catch (err) {
             next(err);
@@ -273,8 +283,9 @@ async function main() {
      *      304: - Not Modified -  No canvas found /  User already see the most up to date canvas
      */
     app.get("/get-canvas", (req, res) => {
-        // console.log("In get-canvas endpoint");
+        console.log("In get-canvas endpoint");
         const canvas = game.get_canvas();
+        console.log("Canvas: ", canvas);
         if (canvas !== false) {
             console.log("Sending canvas...");
             res.status(200).send(canvas);
