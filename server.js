@@ -35,7 +35,9 @@ async function main() {
 
     })
 
-    app.get('/', require('../draw-guess-frontend/src/pages/Home'))
+    app.get('*', (req, res) => {
+        res.sendFile(path.resolve(__dirname, '../draw-guess-frontend/build', 'index.html'));
+    })
 
 
     app.listen(port, () => { // function that will start as enter to server
