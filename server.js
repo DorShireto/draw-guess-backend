@@ -2,6 +2,7 @@
 const { json } = require('express');
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
 const cors = require('cors'); // allow communication in http at chrome based browser engine 
 require('dotenv').config() // all access to process.env
 const mongo_async_handler = require('./DAL/mongo_handler');
@@ -9,51 +10,12 @@ const port = process.env.PORT || "3001";
 // const GameUtils = require('./utils/gameLogic')
 var gameLogic = require('./utils/gameLogic')
 
-
-// let gameStruct = { // default game struct
-//     user1: '',
-//     user1HighestScore: 0,
-//     user2: '',
-//     user2HighestScore: 0,
-//     roomCreated: false,
-//     currentWord: 'test',
-//     wordLevel: 0,
-//     roomID: '',
-//     whosTurn: '',
-//     gameScore: 0,
-//     canvas: null,
-// }
-
-// const add_user_to_game_struct = (userName, highestScore) => {
-//     const { user1, user2 } = gameStruct;
-//     if (user1 === '') {
-//         gameStruct.user1 = userName;
-//         gameStruct.user1HighestScore = highestScore;
-//         // return true;
-//     }
-//     else if (user2 === '') {
-//         gameStruct.user2 = userName;
-//         gameStruct.user2HighestScore = highestScore;
-//         // return true; 
-//     }
-//     // else return false;
-// }
-
-// const set_word = (word) => {
-//     gameStruct.currentWord = word;
-// }
-// const set_turn = (userName) => {
-//     if (gameStruct.user1 === userName) gameStruct.whosTurn = 1;
-//     else gameStruct.whosTurn = 2;
-// }
-
-
-
 async function main() {
     // express app
     const app = express(); // create server
     app.use(express.json()); // parsing
     app.use(cors()) // Cross-Origin Resource Sharing
+    app.use(express.static(path.join(__dirname, '../draw-guess-frontend/build'))); //To serve static files such as images, CSS files, and JavaScript files
     // DB connection
     await mongo_async_handler.init_mongo_connection();
     // Game Struct class
