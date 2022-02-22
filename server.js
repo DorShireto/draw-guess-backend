@@ -35,6 +35,8 @@ async function main() {
 
     })
 
+    app.get('/', require('../draw-guess-frontend/src/pages/Home'))
+
 
     app.listen(port, () => { // function that will start as enter to server
         console.log(`App running on port ${port}`);
